@@ -1,0 +1,1195 @@
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <strings.h>
+#include <math.h>
+#include "util.h"
+#include "eem_parse.h"
+#include <regex.h>
+
+static const char *const eem_codes[] = {
+    "0000", /* System */
+    "0200", /* Rectifier Group */
+    "02", /* Rectifier */
+    "0300", /* Battery Group */
+    "03", /* Battery Unit */
+    "0400", /* DC Distribution Group */
+    "040.4", /* EIB Distribution Unit */
+    "04", /* DC Distribution Fuse Unit */
+    "0500", /* Battery Fuse Group */
+    "05", /* Battery Fuse Unit */
+    "0700", /* LVD Group */
+    "07", /* LVD Unit */
+    "0900", /* AC Group */
+    "0901", /* Rectifier AC */
+    "0902", /* OB AC Unit */
+    "2600", /* Solar Converter Group */
+    "26", /* Solar Converter */
+    "5F0.3", /* EIB Digital Inputs */
+};
+
+const struct eem_device eem_blocks[] = {
+    {				/* System */
+	.class_index = NO_CLASS,
+	.ai_count = 14,
+	.ai_param = {
+	    "System Voltage",
+	    "System Load",
+	    "System Power",
+	    "Total System Power Consumption",
+	    "System Power Peak During Last 24 Hours",
+	    "Average System Power During Last 24 Hours",
+	    "Ambient Temperature",
+	    "Outside Temperature",
+	    "Total System Distributed Power",
+	    "Power Efficiency",
+	    "IB2-1 Temp 1",
+	    "IB2-1 Temp 2",
+	    "EIB-1 Temp 1",
+	    "EIB-1 Temp 2",
+	},
+	.ao_count = 22,
+	.ao_param = {
+	    "System Voltage Set Point",
+	    "Under voltage 1 level",
+	    "Under voltage 1 hyst (cease limit)",
+	    "Under voltage 2 level",
+	    "Under voltage 2 hyst (cease limit)",
+	    "Over voltage level",
+	    "Over voltage hyst (cease limit)",
+	    "Mains Fault Alarm Delay",
+	    "Reserved",
+	    "High Ambient Temperature Limit",
+	    "Low Ambient Temperature Limit",
+	    "Generator runtime at high temperature alarm",
+	    "High outside temperature limit",
+	    "Low outside temperature limit",
+	    "High IB2-1 temperature limit",
+	    "Low IB2-1 temperature limit",
+	    "High IB2-2 temperature limit",
+	    "Low IB2-2 temperature limit",
+	    "High EIB-1 temperature limit",
+	    "Low EIB-1 temperature limit",
+	    "High EIB-2 temperature limit",
+	    "Low EIB-2 temperature limit",
+	},
+	.di_count = 98,
+	.di_param = {
+	    "Opto Communication failure",
+	    "Enable/Disable",
+	    "Mains failure",
+	    "Enable/Disable",
+	    "Under voltage 1",
+	    "Enable/Disable",
+	    "Under voltage 2",
+	    "Enable/Disable",
+	    "Over voltage",
+	    "Enable/Disable",
+	    "High ambient temperature",
+	    "Enable/Disable",
+	    "Remote shut down",
+	    "Enable/Disable",
+	    "General input 1",
+	    "Enable/Disable",
+	    "General input 2",
+	    "Enable/Disable",
+	    "General input 3",
+	    "Enable/Disable",
+	    "General input 4",
+	    "Enable/Disable",
+	    "General input 5",
+	    "Enable/Disable",
+	    "General input 6",
+	    "Enable/Disable",
+	    "General input 7",
+	    "Enable/Disable",
+	    "General input 8",
+	    "Enable/Disable",
+	    "Reserved Alarm Position",
+	    "Enable/Disable",
+	    "General input 10",
+	    "Enable/Disable",
+	    "General input 11",
+	    "Enable/Disable",
+	    "General input 12",
+	    "Enable/Disable",
+	    "General input 13",
+	    "Enable/Disable",
+	    "General input 14",
+	    "Enable/Disable",
+	    "General input 15",
+	    "Enable/Disable",
+	    "General input 16",
+	    "Enable/Disable",
+	    "Supervision Unit Internal Fault",
+	    "Enable/Disable",
+	    "Supervision Unit Uncalibrated",
+	    "Enable/Disable",
+	    "Ambient Temperature Sensor Fault",
+	    "Enable/Disable",
+	    "Low Ambient Temperature",
+	    "Enable/Disable",
+	    "Outgoing Alarms Blocked",
+	    "Enable/Disable",
+	    "System Configuration Fault",
+	    "Enable/Disable",
+	    "CAN Communication Failure",
+	    "Enable/Disable",
+	    "Multiple Units Lost",
+	    "Enable/Disable",
+	    "Load shunt fault",
+	    "Enable/Disable",
+	    "Prio 2 Load Disconnected",
+	    "Enable/Disable",
+	    "System Maintenance Time Limit Alarm",
+	    "Enable/Disable",
+	    "High Load",
+	    "Enable/Disable",
+	    "Smoke detected",
+	    "Enable/Disable",
+	    "Intruder alarm",
+	    "Enable/Disable",
+	    "AC Mains OK",
+	    "Enable/Disable",
+	    "Critical Inverter alarm",
+	    "Enable/Disable",
+	    "Critical DC/DC converter alarm",
+	    "Enable/Disable",
+	    "Cooling alarm",
+	    "Enable/Disable",
+	    "Diesel fail alarm",
+	    "Enable/Disable",
+	    "Aviation Warning Lights alarm",
+	    "Enable/Disable",
+	    "Warning DC/DC converter alarm",
+	    "Enable/Disable",
+	    "Warning Inverter alarm",
+	    "Enable/Disable",
+	    "Outside high temperature alarm",
+	    "Enable/Disable",
+	    "Outside low temperature alarm",
+	    "Enable/Disable",
+	    "SPD Fault",
+	    "Enable/Disable",
+	    "Fan Fault",
+	    "Enable/Disable",
+	},
+	.do_count = 14,
+	.do_param = {
+	    "Hybrid function on/off",
+	    "Enable/Disable",
+	    "Time or Capacity mode (Hybrid) 0 = Time 1 = Capacity",
+	    "Enable/Disable",
+	    "Generator in operation with high temperature (0=DC cooling 1=AC cooling)",
+	    "Enable/Disable",
+	    "Reset Total System Distributed Power",
+	    "Enable/Disable",
+	    "Contactor 1 Control",
+	    "Enable/Disable",
+	    "Contactor 2 Control",
+	    "Enable/Disable",
+	    "Contactor 3 Control",
+	    "Enable/Disable",
+	},
+    },
+    {				/* Rectifier Group */
+	.class_index = Rectifiers_index,
+	.ai_count = 6,
+	.ai_param = {
+	    "Voltage",
+	    "Current",
+	    "Used Capacity",
+	    "Min Used Capacity",
+	    "Max Used Capacity",
+	    "Number of rectifiers",
+	},
+	.ao_count = 5,
+	.ao_param = {
+	    "Walk-In with Load time",
+	    "Input current limit",
+	    "ECO mode best operating point",
+	    "ECO mode load fluctuation range",
+	    "ECO mode switch off delay",
+	},
+	.di_count = 10,
+	.di_param = {
+	    "Double rectifier failure (When more than one rectifier sends Rectifier Internal Fault)",
+	    "Enable/Disable",
+	    "Rectifier Mains Fault (When all rectifiers sends Mains fault)",
+	    "Enable/Disable",
+	    "Mains Fault",
+	    "Enable/Disable",
+	    "Rectifier Lost",
+	    "Enable/Disable",
+	    "ECO mode activated",
+	    "Enable/Disable",
+	},
+	.do_count = 8,
+	.do_param = {
+	    "Reset Rectifer Lost",
+	    "Enable/Disable",
+	    "Walk-in feature on/off",
+	    "Enable/Disable",
+	    "Reset Communication Failure",
+	    "Enable/Disable",
+	    "ECO Mode on/off",
+	    "Enable/Disable",
+	},
+    },
+    {				/* Rectifier */
+	.class_index = Rectifier_index,
+	.ai_count = 6,
+	.ai_param = {
+	    "Voltage",
+	    "Current",
+	    "Temperature",
+	    "Used Capacity",
+	    "Input AC voltage",
+	    "Total running time"
+	},
+	.ao_count = 3,
+	.ao_param = {
+	    "Voltage setpoint",
+	    "Over voltage alarm level",
+	    "High temperature alarm level"
+	},
+	.di_count = 22,
+	.di_param = {
+	    "Rectifier on/off",
+	    "Enable/Disable",
+	    "Rectifier failure",
+	    "Enable/Disable",
+	    "Mains Failure",
+	    "Enable/Disable",
+	    "Over voltage",
+	    "Enable/Disable",
+	    "High temperature",
+	    "Enable/Disable",
+	    "Rectifier Current Limit",
+	    "Enable/Disable",
+	    "Rectifier AC Fault",
+	    "Enable/Disable",
+	    "Rectifier Communication Fail",
+	    "Enable/Disable",
+	    "Rectifier Failure",
+	    "Enable/Disable",
+	    "Power Limit",
+	    "Enable/Disable",
+	    "Fan Failure",
+	    "Enable/Disable"
+	},
+	.do_count = 4,
+	.do_param = {
+	    "Rectifier remote on/off",
+	    "Enable/Disable",
+	    "Remote reset (alarm reset)",
+	    "Enable/Disable"
+	}
+    },
+    {				/* Battery Group */
+	.class_index = NO_CLASS,
+	.ai_count = 3,
+	.ai_param = {
+	    "Voltage",
+	    "Current",
+	    "Temperature",
+	},
+	.ao_count = 51,
+	.ao_param = {
+	    "Very High Battery Temp Limit",
+	    "Very High Battery Temp Limit Hyst",
+	    "High Battery Temp Limit",
+	    "High Battery Temp Limit Hyst",
+	    "Low Battery Temp Limit",
+	    "Low Battery Temp Limit Hyst",
+	    "Very High Battery Temp Limit Ouput volt",
+	    "Battery Current Limit",
+	    "Battery Boost Charge Voltage",
+	    "Battery Boost Charge Factor",
+	    "Reserved",
+	    "Reserved",
+	    "Manual Charge Time",
+	    "Cyclic Charge Time",
+	    "Cyclic Charge Interval",
+	    "Reserved",
+	    "Battery Test Voltage Level",
+	    "Battery Test End Voltage",
+	    "Nominal Battery Capacity",
+	    "Used Capacity Limit",
+	    "Number of Schedule Test per year",
+	    "Scheduled Test Start Time",
+	    "Battery Test Time",
+	    "Nominal Battery Temperature",
+	    "Reserved",
+	    "Reserved",
+	    "Battery Cell Factor",
+	    "Number of Cells",
+	    "Reserved",
+	    "Battery test 1 time",
+	    "Battery test 2 time",
+	    "Battery test 3 time",
+	    "Battery test 4 time",
+	    "Battery test 5 time",
+	    "Battery test 6 time",
+	    "Battery test 7 time",
+	    "Battery test 8 time",
+	    "Battery test 9 time",
+	    "Battery test 10 time",
+	    "Battery test 11 time",
+	    "Battery test 12 time",
+	    "Equalizing Charge Duration",
+	    "Equlizing charge every",
+	    "Cyclic / Equalizing Charges start time",
+	    "Stable Battery Charge Delay",
+	    "Boost charge current tail",
+	    "Cyclic Discharge time",
+	    "Discharge Start Hour",
+	    "Capacity coefficient (Hybrid)",
+	    "Deep Of Discharge/Low capacity level (Hybrid)",
+	    "SM-BRC Resistance Test Interval",
+	},
+	.di_count = 38,
+	.di_param = {
+	    "Battery Test Running",
+	    "Enable/Disable",
+	    "Battery test failure",
+	    "Enable/Disable",
+	    "Battery Boost Charge",
+	    "Enable/Disable",
+	    "Bad battery",
+	    "Enable/Disable",
+	    "Manual Battery Test Running",
+	    "Enable/Disable",
+	    "Schedule Battery Test Running",
+	    "Enable/Disable",
+	    "Automatic Battery Test running",
+	    "Enable/Disable",
+	    "Manual Battery Boost Charge",
+	    "Enable/Disable",
+	    "Cyclic Battery Boost Charge running",
+	    "Enable/Disable",
+	    "Automatic Battery Boost Charge running",
+	    "Enable/Disable",
+	    "Battery Current Limitation running",
+	    "Enable/Disable",
+	    "Temperature sensor failure",
+	    "Enable/Disable",
+	    "High Temperature",
+	    "Enable/Disable",
+	    "Very High Temperature",
+	    "Enable/Disable",
+	    "Low Temperature",
+	    "Enable/Disable",
+	    "Battery shunt fault",
+	    "Enable/Disable",
+	    "High Battery Current",
+	    "Enable/Disable",
+	    "Equalizing Battery Boost Charge running",
+	    "Enable/Disable",
+	    "High load alarm",
+	    "Enable/Disable",
+	},
+	.do_count = 26,
+	.do_param = {
+	    "Reset bad battery alarm",
+	    "Enable/Disable",
+	    "Battery Boost Charge Function On/Off (0: On (default) 1: Off)",
+	    "Enable/Disable",
+	    "Start Battery Boost Charge",
+	    "Enable/Disable",
+	    "Stop Battery Boost Charge",
+	    "Enable/Disable",
+	    "Battery Test Function On/Off (0: On (default) 1: Off)",
+	    "Enable/Disable",
+	    "Start Battery Test (Manual)",
+	    "Enable/Disable",
+	    "Stop Battery Test (Manual and Cyclic)",
+	    "Enable/Disable",
+	    "Battery Temperature Voltage Control On/Off",
+	    "Enable/Disable",
+	    "Automatic Battery Test Function On/Off",
+	    "Enable/Disable",
+	    "Start SM-BRC Resistance Test",
+	    "Enable/Disable",
+	    "Stop SM-BRC Resistance Test",
+	    "Enable/Disable",
+	    "Reset Battery Capacity",
+	    "Enable/Disable",
+	    "Reset Battery Test Failure",
+	    "Enable/Disable",
+	},
+    },
+    {				/* Battery Unit */
+	.class_index = NO_CLASS,
+	.ai_count = 4,
+	.ai_param = {
+	    "Voltage",
+	    "Battery current",
+	    "Temperature",
+	    "Battery capacity",
+	},
+	.ao_count = 1,
+	.ao_param = {
+	    "Nominal Battery Capacity",
+	},
+	.di_count = 8,
+	.di_param = {
+	    "Temperature Sensor Fault",
+	    "Enable/Disable",
+	    "High Temperature",
+	    "Enable/Disable",
+	    "Very High Temperature",
+	    "Enable/Disable",
+	    "Low Temperature",
+	    "Enable/Disable",
+	},
+	.do_count = 0,
+    },
+    {				/* DC Distribution Group */
+	.class_index = NO_CLASS,
+	.ai_count = 2,
+	.ai_param = {
+	    "Voltage",
+	    "Current",
+	},
+	.ao_count = 0,
+	.di_count = 0,
+	.do_count = 0,
+    },
+    {               /* EIB Distrinution Unit */
+        .class_index = NO_CLASS,
+        .ai_count = 4,
+        .ai_param = {
+            "Current 1",
+            "Current 2",
+            "--",
+            "Current 3",
+        },
+        .ao_count = 0,
+        .di_count = 0,
+        .do_count = 0,
+    },
+    {				/* DC Distribution Fuse Unit */
+	.class_index = NO_CLASS,
+	.ai_count = 30,
+	.ai_param = {
+	    "Voltage",
+	    "Current 1",
+	    "Current 2",
+	    "Current 3",
+	    "Current 4",
+	    "Current 5",
+	    "Current 6",
+	    "Current 7",
+	    "Current 8",
+	    "Current 9",
+	    "Current 10",
+	    "Current 11",
+	    "Current 12",
+	    "Current 13",
+	    "Current 14",
+	    "Current 15",
+	    "Current 16",
+	    "Current 17",
+	    "Current 18",
+	    "Current 19",
+	    "Current 20",
+	    "Current 21",
+	    "Current 22",
+	    "Current 23",
+	    "Current 24",
+	    "Current 25",
+	    "Distributed Power 1",
+	    "Distributed Power 2",
+	    "Distributed Power 3",
+	    "Distributed Power 4",
+	},
+	.ao_count = 0,
+	.di_count = 50,
+	.di_param = {
+	    "Fuse 1",
+	    "Enable/Disable",
+	    "Fuse 2",
+	    "Enable/Disable",
+	    "Fuse 3",
+	    "Enable/Disable",
+	    "Fuse 4",
+	    "Enable/Disable",
+	    "Fuse 5",
+	    "Enable/Disable",
+	    "Fuse 6",
+	    "Enable/Disable",
+	    "Fuse 7",
+	    "Enable/Disable",
+	    "Fuse 8",
+	    "Enable/Disable",
+	    "Fuse 9",
+	    "Enable/Disable",
+	    "Fuse 10",
+	    "Enable/Disable",
+	    "Fuse 11",
+	    "Enable/Disable",
+	    "Fuse 12",
+	    "Enable/Disable",
+	    "Fuse 13",
+	    "Enable/Disable",
+	    "Fuse 14",
+	    "Enable/Disable",
+	    "Fuse 15",
+	    "Enable/Disable",
+	    "Fuse 16",
+	    "Enable/Disable",
+	    "Fuse 17",
+	    "Enable/Disable",
+	    "Fuse 18",
+	    "Enable/Disable",
+	    "Fuse 19",
+	    "Enable/Disable",
+	    "Fuse 20",
+	    "Enable/Disable",
+	    "Fuse 21",
+	    "Enable/Disable",
+	    "Fuse 22",
+	    "Enable/Disable",
+	    "Fuse 23",
+	    "Enable/Disable",
+	    "Fuse 24",
+	    "Enable/Disable",
+	    "Fuse 25",
+	    "Enable/Disable",
+	},
+	.do_count = 8,
+	.do_param = {
+	    "Reset Distributed Power 1",
+	    "Enable/Disable",
+	    "Reset Distributed Power 2",
+	    "Enable/Disable",
+	    "Reset Distributed Power 3",
+	    "Enable/Disable",
+	    "Reset Distributed Power 4",
+	    "Enable/Disable",
+	},
+    },
+    {				/* Battery Fuse Group */
+	.class_index = NO_CLASS,
+	.ai_count = 2,
+	.ai_param = {
+	    "Voltage",
+	    "Current",
+	},
+	.ao_count = 0,
+	.di_count = 0,
+	.do_count = 0,
+    },
+    {				/* Battery Fuse Unit */
+	.class_index = NO_CLASS,
+	.ai_count = 4,
+	.ai_param = {
+	    "Voltage 1",
+	    "Current 1",
+	    "Voltage 2",
+	    "Current 2",
+	},
+	.ao_count = 0,
+	.di_count = 10,
+	.di_param = {
+	    "Fuse Failure 1",
+	    "Enable/Disable",
+	    "Fuse Failure 2",
+	    "Enable/Disable",
+	    "Fuse Failure 3",
+	    "Enable/Disable",
+	    "Uncalibrated",
+	    "Enable/Disable",
+	    "Fuse Failure 4",
+	    "Enable/Disable",
+	},
+	.do_count = 0,
+    },
+    {				/* LVD Group */
+	.class_index = NO_CLASS,
+	.ai_count = 0,
+	.ao_count = 10,
+	.ao_param = {
+	    "Non Prio Trip Voltage",
+	    "Non Prio Trip Hyst",
+	    "Prio Trip Voltage",
+	    "Prio Trip Hyst",
+	    "Load Disconnect Mode",
+	    "Non Prio Trip time",
+	    "Prio Trip Time",
+	    "Reconnect Level",
+	    "High Temp Disconnect Level",
+	    "High Temp Reconnect Level",
+	},
+	.di_count = 2,
+	.di_param = {
+	    "Load Disconnect Error",
+	    "Enable/Disable",
+	},
+	.do_count = 6,
+	.do_param = {
+	    "Load Disconnect On/Off",
+	    "Enable/Disable",
+	    "Normal Contactor enable/disable",
+	    "Enable/Disable",
+	    "Prio Contactor enable/disable",
+	    "Enable/Disable",
+	},
+    },
+    {				/* LVD Unit */
+	.class_index = LoadDisconnect_index,
+	.ai_count = 0,
+	.ao_count = 4,
+	.ao_param = {
+	    "LVD time",
+	    "LVD voltage",
+	    "LVD reconnect delay",
+	    "LVD reconnect voltage",
+	},
+	.di_count = 2,
+	.di_param = {
+	    "LVD Disconnected",
+	    "Enable/Disable",
+	},
+	.do_count = 10,
+	.do_param = {
+	    "LVD enable",
+	    "Enable/Disable",
+	    "LVD mode(0:Voltage, 1:Time)",
+	    "Enable/Disable",
+	    "Reserved",
+	    "Enable/Disable",
+	    "Reserved",
+	    "Enable/Disable",
+	    "HTD enable",
+	    "Enable/Disable",
+	},
+    },
+    {				/* AC Group */
+	.class_index = NO_CLASS,
+	.ai_count = 6,
+	.ai_param = {
+	    "Total Phase 1 Current",
+	    "Total Phase 2 Current",
+	    "Total Phase 3 Current",
+	    "Total Phase 1 Power",
+	    "Total Phase 2 Power",
+	    "Total Phase 3 Power",
+	},
+	.ao_count = 0,
+	.di_count = 0,
+	.do_count = 0,
+    },
+    {				/* Rectifier AC */
+	.class_index = NO_CLASS,
+	.ai_count = 32,
+	.ai_param = {
+	    "Main Voltage, Phase 1-2",
+	    "Main Voltage, Phase 2-3",
+	    "Main Voltage, Phase 3-1",
+	    "Voltage, Phase 1",
+	    "Voltage, Phase 2",
+	    "Voltage, Phase 3",
+	    "Current, Phase 1",
+	    "Current, Phase 2",
+	    "Current, Phase 3",
+	    "Ambient Temperature",
+	    "Mains Frequency",
+	    "Mains Failure Counter, Phase 1",
+	    "Mains Failure Counter, Phase 2",
+	    "Mains Failure Counter, Phase 3",
+	    "Frequency Failure Counter",
+	    "Apparent Power, Phase 1",
+	    "Apparent Power, Phase 2",
+	    "Apparent Power, Phase 3",
+	    "Real Power, Phase 1",
+	    "Real Power, Phase 2",
+	    "Real Power, Phase 3",
+	    "Reactive Power, Phase 1",
+	    "Reactive Power, Phase 2",
+	    "Reactive Power, Phase 3",
+	    "Power Factor, Phase 1",
+	    "Power Factor, Phase 2",
+	    "Power Factor, Phase 3",
+	    "Energy Consumption 1",
+	    "Energy Consumption 2",
+	    "THD Current, Phase 1",
+	    "THD Current, Phase 2",
+	    "THD Current, Phase 3",
+	},
+	.ao_count = 11,
+	.ao_param = {
+	    "Nominal Mains Voltage",
+	    "Nominal Phase Voltage",
+	    "Nominal Frequency",
+	    "Mains Failure Alarm Threshold 1",
+	    "Mains Failure Alarm Threshold 2",
+	    "Frequency Alarm Threshold",
+	    "Current Factor",
+	    "Alarm Duration",
+	    "Current Alarm Threshold",
+	    "Temperature Alarm Threshold, High",
+	    "Temperature Alarm Threshold, Low",
+	},
+	.di_count = 70,
+	.di_param = {
+	    "Unit Uncalibrated",
+	    "Enable/Disable",
+	    "Supervision Fail",
+	    "Enable/Disable",
+	    "Over voltage, Phase 1-2",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 1-2",
+	    "Enable/Disable",
+	    "Under voltage, Phase 1-2",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 1-2",
+	    "Enable/Disable",
+	    "Over voltage, Phase 1-3",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 1-3",
+	    "Enable/Disable",
+	    "Under voltage, Phase 1-3",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 1-3",
+	    "Enable/Disable",
+	    "Over voltage, Phase 2-3",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 2-3",
+	    "Enable/Disable",
+	    "Under voltage, Phase 2-3",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 2-3",
+	    "Enable/Disable",
+	    "Over voltage, Phase 1",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 1",
+	    "Enable/Disable",
+	    "Under voltage, Phase 1",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 1",
+	    "Enable/Disable",
+	    "Over voltage, Phase 2",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 2",
+	    "Enable/Disable",
+	    "Under voltage, Phase 2",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 2",
+	    "Enable/Disable",
+	    "Over voltage, Phase 3",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 3",
+	    "Enable/Disable",
+	    "Under voltage, Phase 3",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 3",
+	    "Enable/Disable",
+	    "Mains Failure",
+	    "Enable/Disable",
+	    "Severe Mains Failure",
+	    "Enable/Disable",
+	    "High Current, Phase 1",
+	    "Enable/Disable",
+	    "High Current, Phase 2",
+	    "Enable/Disable",
+	    "High Current, Phase 3",
+	    "Enable/Disable",
+	    "High Frequency Failure",
+	    "Enable/Disable",
+	    "High Temperature Failure",
+	    "Enable/Disable",
+	    "Low Frequency Failure",
+	    "Enable/Disable",
+	    "Low Temperature Failure",
+	    "Enable/Disable",
+	},
+	.do_count = 10,
+	.do_param = {
+	    "Use Default Settings",
+	    "Enable/Disable",
+	    "Reset Mains Fail Counter, Phase 1",
+	    "Enable/Disable",
+	    "Reset Mains Fail Counter, Phase 2",
+	    "Enable/Disable",
+	    "Reset Mains Fail Counter, Phase 3",
+	    "Enable/Disable",
+	    "Reset Frequency Fail Counter",
+	    "Enable/Disable",
+	},
+    },
+    {				/* OB AC Unit */
+	.class_index = NO_CLASS,
+	.ai_count = 31,
+	.ai_param = {
+	    "Main Voltage, Phase 1-2",
+	    "Main Voltage, Phase 2-3",
+	    "Main Voltage, Phase 3-1",
+	    "Voltage, Phase 1",
+	    "Voltage, Phase 2",
+	    "Voltage, Phase 3",
+	    "Current, Phase 1",
+	    "Current, Phase 2",
+	    "Current, Phase 3",
+	    "Ambient Temperature",
+	    "Mains Frequency",
+	    "Mains Failure Counter, Phase 1",
+	    "Mains Failure Counter, Phase 2",
+	    "Mains Failure Counter, Phase 3",
+	    "Frequency Failure Counter",
+	    "Apparent Power, Phase 1",
+	    "Apparent Power, Phase 2",
+	    "Apparent Power, Phase 3",
+	    "Real Power, Phase 1",
+	    "Real Power, Phase 2",
+	    "Real Power, Phase 3",
+	    "Reactive Power, Phase 1",
+	    "Reactive Power, Phase 2",
+	    "Reactive Power, Phase 3",
+	    "Power Factor, Phase 1",
+	    "Power Factor, Phase 2",
+	    "Power Factor, Phase 3",
+	    "Energy Consumption 1",
+	    "Energy Consumption 2",
+	    "THD Current, Phase 1",
+	    "THD Current, Phase 2",
+	    "THD Current, Phase 3",
+	},
+	.ao_count = 11,
+	.ao_param = {
+	    "Nominal Mains Voltage",
+	    "Nominal Phase Voltage",
+	    "Mains Failure Alarm Threshold 1",
+	    "Mains Failure Alarm Threshold 2",
+	    "Frequency Alarm Threshold",
+	    "Current Factor",
+	    "Alarm Duration",
+	    "Current Alarm Threshold",
+	    "Temperature Alarm Threshold, High",
+	    "Temperature Alarm Threshold, Low",
+	},
+	.di_count = 70,
+	.di_param = {
+	    "Unit Uncalibrated",
+	    "Enable/Disable",
+	    "Supervision Fail",
+	    "Enable/Disable",
+	    "Over voltage, Phase 1-2",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 1-2",
+	    "Enable/Disable",
+	    "Under voltage, Phase 1-2",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 1-2",
+	    "Enable/Disable",
+	    "Over voltage, Phase 1-3",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 1-3",
+	    "Enable/Disable",
+	    "Under voltage, Phase 1-3",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 1-3",
+	    "Enable/Disable",
+	    "Over voltage, Phase 2-3",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 2-3",
+	    "Enable/Disable",
+	    "Under voltage, Phase 2-3",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 2-3",
+	    "Enable/Disable",
+	    "Over voltage, Phase 1",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 1",
+	    "Enable/Disable",
+	    "Under voltage, Phase 1",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 1",
+	    "Enable/Disable",
+	    "Over voltage, Phase 2",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 2",
+	    "Enable/Disable",
+	    "Under voltage, Phase 2",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 2",
+	    "Enable/Disable",
+	    "Over voltage, Phase 3",
+	    "Enable/Disable",
+	    "Severe Over voltage, Phase 3",
+	    "Enable/Disable",
+	    "Under voltage, Phase 3",
+	    "Enable/Disable",
+	    "Severe Under voltage, Phase 3",
+	    "Enable/Disable",
+	    "Mains Failure",
+	    "Enable/Disable",
+	    "Severe Mains Failure",
+	    "Enable/Disable",
+	    "High Current, Phase 1",
+	    "Enable/Disable",
+	    "High Current, Phase 2",
+	    "Enable/Disable",
+	    "High Current, Phase 3",
+	    "Enable/Disable",
+	    "High Frequency Failure",
+	    "Enable/Disable",
+	    "High Temperature Failure",
+	    "Enable/Disable",
+	    "Low Frequency Failure",
+	    "Enable/Disable",
+	    "Low Temperature Failure",
+	    "Enable/Disable",
+	},
+	.do_count = 10,
+	.do_param = {
+	    "User Default Settings",
+	    "Enable/Disable",
+	    "Reset Mains Fail Counter, Phase 1",
+	    "Enable/Disable",
+	    "Reset Mains Fail Counter, Phase 2",
+	    "Enable/Disable",
+	    "Reset Mains Fail Counter, Phase 3",
+	    "Enable/Disable",
+	    "Reset Frequency Fail Counter",
+	    "Enable/Disable",
+	},
+    },
+    {				/* Solar Converter Group */
+	.class_index = SolarConverters_index,
+	.ai_count = 6,
+	.ai_param = {
+	    "Voltage",
+	    "Current",
+	    "Used Capacity",
+	    "Min Used Capacity",
+	    "Max Used Capacity",
+	    "Number of converters",
+	},
+	.ao_count = 0,
+	.di_count = 14,
+	.di_param = {
+	    "Double converter failure",
+	    "Enable/Disable",
+	    "Reserved",
+	    "Enable/Disable",
+	    "Converter Lost",
+	    "Enable/Disable",
+	    "Capacity Limitation",
+	    "Enable/Disable",
+	    "Unbalanced current",
+	    "Enable/Disable",
+	    "Overvoltage",
+	    "Enable/Disable",
+	    "Local communication failure",
+	    "Enable/Disable",
+	},
+	.do_count = 4,
+	.do_param = {
+	    "Reset Converter Lost",
+	    "Enable/Disable",
+	    "Reset modules",
+	    "Enable/Disable",
+	},
+    },
+    {				/* Solar Converter */
+	.class_index = SolarConverter_index,
+	.ai_count = 11,
+	.ai_param = {
+	    "Voltage",
+	    "Current",
+	    "Reserved",
+	    "Reserved",
+	    "Reserved",
+	    "Total running time",
+	    "Limited current",
+	    "Input voltage",
+	    "Input current",
+	    "Temperature",
+	    "Output capacity",
+	},
+	.ao_count = 0,
+	.di_count = 36,
+	.di_param = {
+	    "Converter on/off",
+	    "Enable/Disable",
+	    "Converter failure",
+	    "Enable/Disable",
+	    "Mains Failure",
+	    "Enable/Disable",
+	    "Over voltage",
+	    "Enable/Disable",
+	    "Reserved",
+	    "Enable/Disable",
+	    "Converter Current Limit",
+	    "Enable/Disable",
+	    "Reserved",
+	    "Enable/Disable",
+	    "Converter Communication Fail",
+	    "Enable/Disable",
+	    "Reserved",
+	    "Enable/Disable",
+	    "Power Limit",
+	    "Enable/Disable",
+	    "Fan Failure",
+	    "Enable/Disable",
+	    "Limited due to high temp",
+	    "Enable/Disable",
+	    "Fans in full speed",
+	    "Enable/Disable",
+	    "WALK in",
+	    "Enable/Disable",
+	    "Equalized charging",
+	    "Enable/Disable",
+	    "Test in process",
+	    "Enable/Disable",
+	    "Over temperature",
+	    "Enable/Disable",
+	    "Unbalanced current",
+	    "Enable/Disable",
+	},
+	.do_count = 4,
+	.do_param = {
+	    "Converter remote on/off",
+	    "Enable/Disable",
+	    "Remote reset (alarm reset)",
+	    "Enable/Disable",
+	},
+    }
+};
+
+static float
+eem_atof(char *s)
+{
+    int32_t m;
+    uint32_t sign = 0;
+    uint32_t e;
+    union {
+	uint32_t u;
+	float f;
+    } u;
+    unsigned long ul = strtoul(s, NULL, 16);
+    if (!ul) {
+	return 0;
+    }
+    if (ul == 0x7FFFFF80) {
+	return NAN;
+    }
+    m = (int32_t) ul;
+    m >>= 7;
+    m &= 0xFFFFFFFE;
+    if (m < 0) {
+	m = -m;
+	sign = 0x80000000;
+    }
+    m &= 0x7FFFFE;
+    e = (int8_t)(ul & 0xff) + 126;
+    u.u = sign | ((e << 23) & 0x7F800000) | m;
+    return u.f;
+}
+
+eemid_t
+eem_getid(const char *s)
+{
+    size_t i;
+    const char *code;
+    regex_t rgx;
+    for (i = 0; i < MAXCOUNT(eem_codes); i++) {
+        code = eem_codes[i];
+        if (strchr(code, POINT)) {  // looking for dot
+            if (!regcomp(&rgx, code, 0)
+                    && !regexec(&rgx, s, 0, NULL, 0)) {
+                regfree(&rgx);
+                break;
+            }
+            regfree(&rgx);
+        } else if (!strncmp(s, code, strlen(code))) {
+            break;
+        }
+    }
+    return i;
+}
+
+const char *
+eem_getfloat(const char *s, uint8_t count, float **valp)
+{
+    char tmp[EEM_STRSZ_MAX];
+    float *val;
+
+    if (!s) {
+	return NULL;
+    }
+    if (count) {
+	if (!(val = *valp)) {
+	    if (!(val = calloc(count, sizeof(float)))) {
+		return NULL;
+	    }
+	    *valp = val;
+	}
+	while (EEM_NOBREAK(s) && strlen(s) >= EEM_STRSZ_FLOAT && count--) {
+	    strncpy(tmp, s, EEM_STRSZ_FLOAT);
+	    tmp[EEM_STRSZ_FLOAT] = '\0';
+	    *val++ = eem_atof(tmp);
+	    s += EEM_STRSZ_FLOAT;
+	}
+	while (EEM_NOBREAK(s)) {
+	    s++;
+	}
+    }
+    if (*s == '!') {
+	s++;
+    }
+    return s;
+}
+
+const char *
+eem_getbit(const char *s, uint8_t count, uint8_t **valp)
+{
+    char hex[2], byte;
+    uint8_t *val;
+    uint32_t i;
+
+    if (!s) {
+	return NULL;
+    }
+    if (count) {
+	if (!(val = *valp)) {
+	    if (!(val = calloc(count, sizeof(uint8_t)))) {
+		return NULL;
+	    }
+	    *valp = val;
+	}
+	while (EEM_NOBREAK(s)) {
+	    hex[0] = *s++;
+	    hex[1] = '\0';
+	    byte = (char)strtol(hex, NULL, 16);
+	    for (i = 0; i < 4; i++) {
+		*val++ = (byte & 0x08) != 0;
+		byte <<= 1;
+		if (!--count) {
+		    goto out;
+		}
+	    }
+	}
+    out:
+	while (EEM_NOBREAK(s)) {
+	    s++;
+	}
+    }
+    if (*s == '!') {
+	s++;
+    }
+    return s;
+}
+
+const struct eem_device *
+eem_device_find(const char *id)
+{
+    eemid_t eemid = eem_getid(id);
+    if (eemid != EEM_UNKNOWN) {
+	return &eem_blocks[eemid];
+    }
+    return NULL;
+}
